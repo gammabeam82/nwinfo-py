@@ -6,7 +6,7 @@ import subprocess
 from datetime import datetime
 from time import sleep
 
-INTERVAL = 30
+INTERVAL = 60
 SCAN_COMMAND = ('sudo', 'nmap', '-sn', '192.168.1.1/26', '--disable-arp-ping')
 ICON_ONLINE = 'notification-network-wireless-connected'
 MAC_REGEX = r'([0-9a-f]{2}:?){6}'
