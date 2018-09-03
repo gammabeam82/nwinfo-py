@@ -7,10 +7,61 @@ from datetime import datetime
 from time import sleep
 
 INTERVAL = 60
-SCAN_COMMAND = ('sudo', 'nmap', '-sn', '192.168.1.1/26', '--disable-arp-ping')
-ICON_ONLINE = 'notification-network-wireless-connected'
-MAC_REGEX = r'([0-9a-f]{2}:?){6}'
-IP_REGEX = r'([0-9]{1,3}\.){3}[0-9]{1,3}'
+STORAGE_FILE = './known-devices.txt'
+
+
+class Network:
+    SCAN_COMMAND = ('sudo', 'nmap', '-sn','192.168.1.1/26', '--disable-arp-ping')
+    MAC_REGEX = r'([0-9a-f]{2}:?){6}'
+    IP_REGEX = r'([0-9]{1,3}\.){3}[0-9]{1,3}'
+
+    def scan(self) -> set:
+        result = subprocess.run(self.SCAN_COMMAND, stdout=subprocess.PIPE)
+        cmd_output = result.stdout.decode('UTF-8')
+        
+        macs = [m.group(0) for m in re.finditer(self.MAC_REGEX, cmd_output, re.IGNORECASE)]
+        ip = [i.group(0) for i in re.finditer(self.IP_REGEX, cmd_output)]
+
+        result = set()
+        for index, addr in enumerate(ip):
+            if(index < len(macs)):
+                mac = macs[index]
+            else:
+                mac = ''
+            result.add((addr, mac))
+
+        return result
+
+
+class Storage:
+    DEFAULT_DEVICE_NAME = 'Unknown'
+
+    def __init__(self, filename: str) -> None:
+        self.filename = filename
+        self.load_known_devices()
+
+    def load_known_devices(self) -> None:
+        self.devices = dict()
+        with open(self.filename, 'a+') as file:
+            file.seek(0)
+            for line in file:
+                mac, name = line.split('>')
+                self.devices[mac.strip()] = name.strip()
+
+    def add_device(self, mac: str) -> None:
+        with open(self.filename, 'a+') as file:
+            file.write('{} > {}\n'.format(mac, self.DEFAULT_DEVICE_NAME))
+            self.load_known_devices()
+
+    def get_device_name(self, mac: str) -> str:
+        device_name = self.DEFAULT_DEVICE_NAME
+        if len(mac):
+            if mac in self.devices:
+                device_name = self.devices.get(mac)
+            else:
+                self.add_device(mac)
+
+        return device_name
 
 
 class Colors(enum.Enum):
@@ -20,43 +71,46 @@ class Colors(enum.Enum):
     RED = '\033[91m'
 
 
-def scan() -> str:
-    result = subprocess.run(SCAN_COMMAND, stdout=subprocess.PIPE)
-    return result.stdout.decode('UTF-8')
+class Notifier():
+    ICON_ONLINE = 'notification-network-wireless-connected'
+
+    def __init__(self, storage: Storage) -> None:
+        self.storage = storage
+
+    def process_list(self, data: set, message='', color=Colors.WHITE, desktop_notify=False) -> None:
+        for ip, mac in data:
+            device_name = self.storage.get_device_name(mac)
+            if not len(mac):
+                mac = " " * 17
+            line = '{}{}\t{}\t{}\t{}\t{}'.format(
+                color.value,
+                datetime.now().strftime('%H:%M:%S'),
+                ip,
+                mac,
+                message,
+                device_name
+            )
+            print(line)
+
+            if desktop_notify:
+                desktop_message = '{} online'.format(device_name)
+                subprocess.run(('notify-send', desktop_message, '-i', self.ICON_ONLINE))
+
+        print('{}{}'.format(Colors.WHITE.value, '-' * 120))
 
 
-def format_output(cmd_output: str) -> set:
-    macs = [m.group(0) for m in re.finditer(MAC_REGEX, cmd_output, re.IGNORECASE)]
-    ip = [i.group(0) for i in re.finditer(IP_REGEX, cmd_output)]
-
-    result = set()
-    for index, addr in enumerate(ip):
-        if(index < len(macs)):
-            mac = macs[index]
-        else:
-            mac = ''
-        result.add((addr, mac))
-
-    return result
-
-
-def print_list(data: set, message='', color=Colors.WHITE, notify=False):
-    for ip, mac in data:
-        if notify:
-            n_message = '{} online'.format(mac)
-            subprocess.run(('notify-send', n_message, '-i', ICON_ONLINE))
-        line = '{4}{0}\t{1}\t{2}\t{3}'.format(datetime.now().strftime('%H:%M:%S'), ip, mac, message, color.value)
-        print(line)
-    print('{}{}'.format(Colors.WHITE.value, '-'*80))
+scanner = Network()
+storage = Storage(STORAGE_FILE)
+notifier = Notifier(storage)
 
 
 try:
-    previous = format_output(scan())
-    print_list(previous)
+    previous = scanner.scan()
+    notifier.process_list(data=previous)
 
     while True:
         sleep(INTERVAL)
-        current = format_output(scan())
+        current = scanner.scan()
 
         offline = previous.difference(current)
         online = current.difference(previous)
@@ -65,19 +119,18 @@ try:
             params = {
                 'data': offline,
                 'color': Colors.RED,
-                'notify': False,
                 'message': 'offline'
             }
-            print_list(**params)
+            notifier.process_list(**params)
 
         if len(online):
             params = {
                 'data': online,
                 'color': Colors.GREEN,
-                'notify': True,
+                'desktop_notify': True,
                 'message': 'online'
             }
-            print_list(**params)
+            notifier.process_list(**params)
 
         previous = current.copy()
 
