@@ -18,9 +18,12 @@ class Network:
     def scan(self) -> set:
         result = subprocess.run(self.SCAN_COMMAND, stdout=subprocess.PIPE)
         cmd_output = result.stdout.decode('UTF-8')
-        
-        macs = [m.group(0) for m in re.finditer(self.MAC_REGEX, cmd_output, re.IGNORECASE)]
-        ip = [i.group(0) for i in re.finditer(self.IP_REGEX, cmd_output)]
+
+        return self.parse(cmd_output)
+
+    def parse(self, raw_output: str) -> set:
+        macs = [m.group(0) for m in re.finditer(self.MAC_REGEX, raw_output, re.IGNORECASE)]
+        ip = [i.group(0) for i in re.finditer(self.IP_REGEX, raw_output)]
 
         result = set()
         for index, addr in enumerate(ip):
