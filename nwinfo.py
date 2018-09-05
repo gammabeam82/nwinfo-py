@@ -18,7 +18,6 @@ class Network:
     def scan(self) -> set:
         result = subprocess.run(self.SCAN_COMMAND, stdout=subprocess.PIPE)
         cmd_output = result.stdout.decode('UTF-8')
-
         return self.parse(cmd_output)
 
     def parse(self, raw_output: str) -> set:
@@ -27,12 +26,8 @@ class Network:
 
         result = set()
         for index, addr in enumerate(ip):
-            if(index < len(macs)):
-                mac = macs[index]
-            else:
-                mac = ''
+            mac = macs[index] if index < len(macs) else ''
             result.add((addr, mac))
-
         return result
 
 
@@ -63,7 +58,6 @@ class Storage:
                 device_name = self.devices.get(mac)
             else:
                 self.add_device(mac)
-
         return device_name
 
 
@@ -83,8 +77,10 @@ class Notifier():
     def process_list(self, data: set, message='', color=Colors.WHITE, desktop_notify=False) -> None:
         for ip, mac in data:
             device_name = self.storage.get_device_name(mac)
-            if not len(mac):
-                mac = " " * 17
+            if desktop_notify:
+                desktop_message = '{} online'.format(device_name)
+                subprocess.run(('notify-send', desktop_message, '-i', self.ICON_ONLINE))
+            mac = mac if len(mac) else " " * 17
             line = '{}{}\t{}\t{}\t{}\t{}'.format(
                 color.value,
                 datetime.now().strftime('%H:%M:%S'),
@@ -94,11 +90,6 @@ class Notifier():
                 device_name
             )
             print(line)
-
-            if desktop_notify:
-                desktop_message = '{} online'.format(device_name)
-                subprocess.run(('notify-send', desktop_message, '-i', self.ICON_ONLINE))
-
         print('{}{}'.format(Colors.WHITE.value, '-' * 120))
 
 
