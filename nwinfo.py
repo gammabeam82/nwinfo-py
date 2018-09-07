@@ -11,7 +11,7 @@ STORAGE_FILE = './known-devices.txt'
 
 
 class Network:
-    SCAN_COMMAND = ('sudo', 'nmap', '-sn','192.168.1.1/26', '--disable-arp-ping')
+    SCAN_COMMAND = ('sudo', 'nmap', '-sn', '192.168.1.1/26', '--disable-arp-ping')
     MAC_REGEX = r'([0-9a-f]{2}:?){6}'
     IP_REGEX = r'([0-9]{1,3}\.){3}[0-9]{1,3}'
 
@@ -23,7 +23,6 @@ class Network:
     def parse(self, raw_output: str) -> set:
         macs = [m.group(0) for m in re.finditer(self.MAC_REGEX, raw_output, re.IGNORECASE)]
         ip = [i.group(0) for i in re.finditer(self.IP_REGEX, raw_output)]
-
         result = set()
         for index, addr in enumerate(ip):
             mac = macs[index] if index < len(macs) else ''
@@ -93,40 +92,40 @@ class Notifier():
         print('{}{}'.format(Colors.WHITE.value, '-' * 120))
 
 
-scanner = Network()
-storage = Storage(STORAGE_FILE)
-notifier = Notifier(storage)
+if __name__ == "__main__":
+    scanner = Network()
+    storage = Storage(STORAGE_FILE)
+    notifier = Notifier(storage)
 
+    try:
+        previous = scanner.scan()
+        notifier.process_list(data=previous)
 
-try:
-    previous = scanner.scan()
-    notifier.process_list(data=previous)
+        while True:
+            sleep(INTERVAL)
+            current = scanner.scan()
 
-    while True:
-        sleep(INTERVAL)
-        current = scanner.scan()
+            offline = previous.difference(current)
+            online = current.difference(previous)
 
-        offline = previous.difference(current)
-        online = current.difference(previous)
+            if len(offline):
+                params = {
+                    'data': offline,
+                    'color': Colors.RED,
+                    'message': 'offline'
+                }
+                notifier.process_list(**params)
 
-        if len(offline):
-            params = {
-                'data': offline,
-                'color': Colors.RED,
-                'message': 'offline'
-            }
-            notifier.process_list(**params)
+            if len(online):
+                params = {
+                    'data': online,
+                    'color': Colors.GREEN,
+                    'desktop_notify': True,
+                    'message': 'online'
+                }
+                notifier.process_list(**params)
 
-        if len(online):
-            params = {
-                'data': online,
-                'color': Colors.GREEN,
-                'desktop_notify': True,
-                'message': 'online'
-            }
-            notifier.process_list(**params)
+            previous = current.copy()
 
-        previous = current.copy()
-
-except KeyboardInterrupt:
-    pass
+    except KeyboardInterrupt:
+        pass
