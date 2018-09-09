@@ -23,11 +23,11 @@ class Network:
     def parse(self, raw_output: str) -> set:
         macs = [m.group(0) for m in re.finditer(self.MAC_REGEX, raw_output, re.IGNORECASE)]
         ip = [i.group(0) for i in re.finditer(self.IP_REGEX, raw_output)]
-        result = set()
-        for index, addr in enumerate(ip):
-            mac = macs[index] if index < len(macs) else ''
-            result.add((addr, mac))
-        return result
+        
+        if len(macs) < len(ip):
+            macs.extend(['' for i in range(len(ip) - len(macs))])
+        
+        return set(zip(ip, macs))
 
 
 class Storage:
