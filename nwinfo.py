@@ -4,6 +4,7 @@ import enum
 import re
 import subprocess
 from datetime import datetime
+from itertools import zip_longest
 from time import sleep
 
 INTERVAL = 60
@@ -23,13 +24,9 @@ class Network:
     def parse(self, raw_output: str) -> set:
         macs = [m.group(0) for m in re.finditer(self.MAC_REGEX, raw_output, re.IGNORECASE)]
         ip = [i.group(0) for i in re.finditer(self.IP_REGEX, raw_output)]
+        return set(zip_longest(ip, macs))
         
-        if len(macs) < len(ip):
-            macs.extend(['' for i in range(len(ip) - len(macs))])
         
-        return set(zip(ip, macs))
-
-
 class Storage:
     DEFAULT_DEVICE_NAME = 'Unknown'
 
@@ -38,21 +35,19 @@ class Storage:
         self.load_known_devices()
 
     def load_known_devices(self) -> None:
-        self.devices = dict()
         with open(self.filename, 'a+') as file:
             file.seek(0)
-            for line in file:
-                mac, name = line.split('>')
-                self.devices[mac.strip()] = name.strip()
+            data = [line.replace('\n', '').split(' ', 1) for line in file if ' ' in line]
+            self.devices = dict(data)
 
     def add_device(self, mac: str) -> None:
-        with open(self.filename, 'a+') as file:
-            file.write('{} > {}\n'.format(mac, self.DEFAULT_DEVICE_NAME))
-            self.load_known_devices()
+        with open(self.filename, 'a') as file:
+            file.write('{} {}\n'.format(mac, self.DEFAULT_DEVICE_NAME))
+            self.devices[mac] = self.DEFAULT_DEVICE_NAME
 
     def get_device_name(self, mac: str) -> str:
         device_name = self.DEFAULT_DEVICE_NAME
-        if len(mac):
+        if mac:
             if mac in self.devices:
                 device_name = self.devices.get(mac)
             else:
@@ -74,12 +69,12 @@ class Notifier():
         self.storage = storage
 
     def process_list(self, data: set, message='', color=Colors.WHITE, desktop_notify=False) -> None:
-        for ip, mac in data:
+        for ip, mac in sorted(data):
             device_name = self.storage.get_device_name(mac)
             if desktop_notify:
                 desktop_message = '{} online'.format(device_name)
                 subprocess.run(('notify-send', desktop_message, '-i', self.ICON_ONLINE))
-            mac = mac if len(mac) else " " * 17
+            mac = mac or " " * 17
             line = '{}{}\t{}\t{}\t{}\t{}'.format(
                 color.value,
                 datetime.now().strftime('%H:%M:%S'),

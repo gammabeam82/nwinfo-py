@@ -21,7 +21,7 @@ class TestNW(unittest.TestCase):
     def test_parse(self):
         parsed = {
             ('192.168.1.1', '54:22:F8:FF:FF:FF'),
-            ('192.168.1.6', ''),
+            ('192.168.1.6', None),
             ('192.168.1.2', '50:8F:4C:FF:FF:FF')
         }
 
