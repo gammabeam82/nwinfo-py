@@ -74,7 +74,7 @@ class Notifier():
             if desktop_notify:
                 desktop_message = '{} online'.format(device_name)
                 subprocess.run(('notify-send', desktop_message, '-i', self.ICON_ONLINE))
-            mac = mac or " " * 17
+            mac = mac or ' '.ljust(17)
             line = '{}{}\t{}\t{}\t{}\t{}'.format(
                 color.value,
                 datetime.now().strftime('%H:%M:%S'),
@@ -84,7 +84,7 @@ class Notifier():
                 device_name
             )
             print(line)
-        print('{}{}'.format(Colors.WHITE.value, '-' * 120))
+        print('{}{}'.format(Colors.WHITE.value, '-'.ljust(120, '-')))
 
 
 if __name__ == "__main__":
