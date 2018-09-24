@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-import enum
 import re
 import subprocess
 from datetime import datetime
+from enum import Enum
 from itertools import zip_longest
 from time import sleep
 
@@ -12,7 +12,7 @@ STORAGE_FILE = './known-devices.txt'
 
 
 class Network:
-    SCAN_COMMAND = ('sudo', 'nmap', '-sn', '192.168.1.1/26', '--disable-arp-ping')
+    SCAN_COMMAND = ('sudo', 'nmap', '-sn', '192.168.1.1/28', '--disable-arp-ping')
     MAC_REGEX = r'([0-9a-f]{2}:?){6}'
     IP_REGEX = r'([0-9]{1,3}\.){3}[0-9]{1,3}'
 
@@ -37,7 +37,7 @@ class Storage:
     def load_known_devices(self) -> None:
         with open(self.filename, 'a+') as file:
             file.seek(0)
-            data = [line.replace('\n', '').split(' ', 1) for line in file if ' ' in line]
+            data = [line.rstrip().split(' ', 1) for line in file if ' ' in line]
             self.devices = dict(data)
 
     def add_device(self, mac: str) -> None:
@@ -55,7 +55,7 @@ class Storage:
         return device_name
 
 
-class Colors(enum.Enum):
+class Colors(Enum):
     GREEN = '\033[92m'
     YELLOW = '\033[93m'
     WHITE = '\33[37m'
